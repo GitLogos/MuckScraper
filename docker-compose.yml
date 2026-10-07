@@ -42,93 +42,93 @@ services:
   # This reproduces the logic of the repo's bootstrap_admin.py inline (using the
   # application's own modules) so the stack no longer depends on that script file.
   # It is idempotent — safe to run on every `up`.
-  db-init:
-    image: ghcr.io/gitlogos/muckscraper-app:${IMAGE_TAG:-latest}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    entrypoint: ["python", "-c"]
-    command:
-      - |
-        import os, sys, time
-        from sqlalchemy.exc import OperationalError
-        from flask_migrate import stamp
-        from aggregator import db
-        from aggregator.app import app, init_db
-        from aggregator.models import User
+  # db-init:
+  #   image: ghcr.io/gitlogos/muckscraper-app:${IMAGE_TAG:-latest}
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   entrypoint: ["python", "-c"]
+  #   command:
+  #     - |
+  #       import os, sys, time
+  #       from sqlalchemy.exc import OperationalError
+  #       from flask_migrate import stamp
+  #       from aggregator import db
+  #       from aggregator.app import app, init_db
+  #       from aggregator.models import User
 
-        def required_env(name):
-            value = os.environ.get(name, "").strip()
-            if not value:
-                raise RuntimeError(f"{name} must be set in .env")
-            return value
+  #       def required_env(name):
+  #           value = os.environ.get(name, "").strip()
+  #           if not value:
+  #               raise RuntimeError(f"{name} must be set in .env")
+  #           return value
 
-        username = required_env("ADMIN_USERNAME")
-        email = required_env("ADMIN_EMAIL")
-        password = required_env("ADMIN_PASSWORD")
+  #       username = required_env("ADMIN_USERNAME")
+  #       email = required_env("ADMIN_EMAIL")
+  #       password = required_env("ADMIN_PASSWORD")
 
-        # Wait for Postgres, then create the pgvector extension + all tables.
-        last_error = None
-        for attempt in range(1, 31):
-            try:
-                init_db()
-                break
-            except OperationalError as exc:
-                last_error = exc
-                print(f"Database not ready yet, retrying ({attempt}/30)...")
-                time.sleep(2)
-        else:
-            raise RuntimeError(f"Database did not become ready: {last_error}")
+  #       # Wait for Postgres, then create the pgvector extension + all tables.
+  #       last_error = None
+  #       for attempt in range(1, 31):
+  #           try:
+  #               init_db()
+  #               break
+  #           except OperationalError as exc:
+  #               last_error = exc
+  #               print(f"Database not ready yet, retrying ({attempt}/30)...")
+  #               time.sleep(2)
+  #       else:
+  #           raise RuntimeError(f"Database did not become ready: {last_error}")
 
-        with app.app_context():
-            # Fresh installs created via db.create_all() need Alembic marked current
-            # so later `flask db upgrade` runs only future migrations. This requires
-            # the migrations/ folder to be present in the image. If it isn't, skip
-            # stamping -- the schema already exists via create_all(), and the admin
-            # user below MUST still be created.
-            #
-            # NOTE: flask_migrate's stamp() calls sys.exit(1) on failure (raising
-            # SystemExit, which is NOT caught by `except Exception`), so we guard on
-            # the folder's existence first AND catch SystemExit as a safety net.
-            if os.path.isdir("migrations"):
-                try:
-                    stamp(revision="head")
-                except (SystemExit, Exception) as exc:
-                    print(f"Alembic stamp failed, continuing without it: {exc}")
-            else:
-                print("migrations/ folder not present in image; skipping Alembic stamp.")
+  #       with app.app_context():
+  #           # Fresh installs created via db.create_all() need Alembic marked current
+  #           # so later `flask db upgrade` runs only future migrations. This requires
+  #           # the migrations/ folder to be present in the image. If it isn't, skip
+  #           # stamping -- the schema already exists via create_all(), and the admin
+  #           # user below MUST still be created.
+  #           #
+  #           # NOTE: flask_migrate's stamp() calls sys.exit(1) on failure (raising
+  #           # SystemExit, which is NOT caught by `except Exception`), so we guard on
+  #           # the folder's existence first AND catch SystemExit as a safety net.
+  #           if os.path.isdir("migrations"):
+  #               try:
+  #                   stamp(revision="head")
+  #               except (SystemExit, Exception) as exc:
+  #                   print(f"Alembic stamp failed, continuing without it: {exc}")
+  #           else:
+  #               print("migrations/ folder not present in image; skipping Alembic stamp.")
 
-            user = User.query.filter_by(username=username).first()
-            email_owner = User.query.filter_by(email=email).first()
-            if email_owner and email_owner.username != username:
-                raise RuntimeError(
-                    f"ADMIN_EMAIL is already used by user '{email_owner.username}'. "
-                    "Choose a different ADMIN_EMAIL or update that user manually."
-                )
-            if user:
-                user.email = email
-                user.is_admin = True
-                user.set_password(password)
-                action = "updated"
-            else:
-                user = User(username=username, email=email, is_admin=True)
-                user.set_password(password)
-                db.session.add(user)
-                action = "created"
-            db.session.commit()
-            print(f"Admin user '{username}' {action}.")
-    environment:
-      FLASK_APP: aggregator.app
-      SECRET_KEY: ${SECRET_KEY}
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-    restart: "no"
+  #           user = User.query.filter_by(username=username).first()
+  #           email_owner = User.query.filter_by(email=email).first()
+  #           if email_owner and email_owner.username != username:
+  #               raise RuntimeError(
+  #                   f"ADMIN_EMAIL is already used by user '{email_owner.username}'. "
+  #                   "Choose a different ADMIN_EMAIL or update that user manually."
+  #               )
+  #           if user:
+  #               user.email = email
+  #               user.is_admin = True
+  #               user.set_password(password)
+  #               action = "updated"
+  #           else:
+  #               user = User(username=username, email=email, is_admin=True)
+  #               user.set_password(password)
+  #               db.session.add(user)
+  #               action = "created"
+  #           db.session.commit()
+  #           print(f"Admin user '{username}' {action}.")
+  #   environment:
+  #     FLASK_APP: aggregator.app
+  #     SECRET_KEY: ${SECRET_KEY}
+  #     DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_HOST: postgres
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+  #     ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+  #     ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  #   restart: "no"
 
   scheduler:
     image: ghcr.io/gitlogos/muckscraper-scheduler:${IMAGE_TAG:-latest}
