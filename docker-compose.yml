@@ -137,8 +137,6 @@ services:
         condition: service_healthy
       meilisearch:
         condition: service_started
-      db-init:
-        condition: service_completed_successfully
     command: sh -c "sleep 15 && python -m news_fetcher.scheduler"
     environment:
       FLASK_APP: aggregator.app
@@ -186,8 +184,6 @@ services:
         condition: service_started
       docker-restart-proxy:
         condition: service_started
-      db-init:
-        condition: service_completed_successfully
     environment:
       FLASK_APP: aggregator.app
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
